@@ -2,6 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import ReactMarkdown from "react-markdown";
 
 declare global {
   interface SpeechRecognitionAlternative {
@@ -58,6 +59,15 @@ type ChatMessage = {
 
 const PROFILE_STORAGE_KEY = "pawguide.profile";
 
+function computeAgeInWeeks(dateOfBirth: string | undefined) {
+  if (!dateOfBirth) return 0;
+  const dob = new Date(dateOfBirth);
+  if (Number.isNaN(dob.getTime())) return 0;
+  const diffMs = Date.now() - dob.getTime();
+  const weeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+  return Math.max(0, weeks);
+}
+
 export default function AskPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<PuppyProfile | null>(null);
@@ -69,7 +79,10 @@ export default function AskPage() {
   const bottomRef = useRef<HTMLDivElement | null>(null);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
   const recognitionRef = useRef<SpeechRecognition | null>(null);
-  const [speechSupported, setSpeechSupported] = useState(false);
+  const speechSupported = useMemo(() => {
+    if (typeof window === "undefined") return false;
+    return Boolean(window.SpeechRecognition ?? window.webkitSpeechRecognition);
+  }, []);
   const [listening, setListening] = useState(false);
 
   useEffect(() => {
@@ -108,12 +121,10 @@ export default function AskPage() {
       window.webkitSpeechRecognition) as unknown as SpeechRecognitionConstructor | undefined;
 
     if (!maybeCtor) {
-      setSpeechSupported(false);
       recognitionRef.current = null;
       return;
     }
 
-    setSpeechSupported(true);
     const rec = new maybeCtor();
     rec.lang = "en-GB";
     rec.interimResults = false;
@@ -142,15 +153,6 @@ export default function AskPage() {
     };
   }, []);
 
-  const ageInWeeks = useMemo(() => {
-    if (!profile?.dateOfBirth) return null;
-    const dob = new Date(profile.dateOfBirth);
-    if (Number.isNaN(dob.getTime())) return null;
-    const diffMs = Date.now() - dob.getTime();
-    const weeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
-    return Math.max(0, weeks);
-  }, [profile?.dateOfBirth]);
-
   useEffect(() => {
     bottomRef.current?.scrollIntoView({ block: "end" });
   }, [messages.length, loading]);
@@ -176,6 +178,7 @@ export default function AskPage() {
     setMessages(nextMessages);
 
     try {
+      const ageInWeeks = computeAgeInWeeks(profile.dateOfBirth);
       const res = await fetch("/api/ask", {
         method: "POST",
         headers: { "content-type": "application/json" },
@@ -183,7 +186,7 @@ export default function AskPage() {
           messages: nextMessages,
           name: profile.name,
           breed: profile.breed ?? "",
-          ageInWeeks: ageInWeeks ?? 0,
+          ageInWeeks,
           gender: profile.gender ?? "Boy",
         }),
       });
@@ -376,7 +379,106 @@ function ChatBubble({ role, content }: { role: "user" | "assistant"; content: st
             : "bg-white/85 text-zinc-900 ring-zinc-200/60",
         ].join(" ")}
       >
-        <div className="whitespace-pre-wrap">{content}</div>
+        {isUser ? (
+          <div className="whitespace-pre-wrap">{content}</div>
+        ) : (
+          <div className="text-zinc-900">
+            <ReactMarkdown
+              components={{
+                h1: ({ children, ...props }) => (
+                  <h1 className="mb-2 mt-3 text-base font-semibold tracking-tight text-zinc-950 first:mt-0" {...props}>
+                    {children}
+                  </h1>
+                ),
+                h2: ({ children, ...props }) => (
+                  <h2 className="mb-2 mt-3 text-sm font-semibold tracking-tight text-zinc-950 first:mt-0" {...props}>
+                    {children}
+                  </h2>
+                ),
+                h3: ({ children, ...props }) => (
+                  <h3 className="mb-1 mt-3 text-sm font-semibold text-zinc-950 first:mt-0" {...props}>
+                    {children}
+                  </h3>
+                ),
+                p: ({ children, ...props }) => (
+                  <p className="my-2 leading-6 first:mt-0 last:mb-0" {...props}>
+                    {children}
+                  </p>
+                ),
+                ul: ({ children, ...props }) => (
+                  <ul className="my-2 ml-5 list-disc space-y-1 marker:text-zinc-400" {...props}>
+                    {children}
+                  </ul>
+                ),
+                ol: ({ children, ...props }) => (
+                  <ol className="my-2 ml-5 list-decimal space-y-1 marker:text-zinc-400" {...props}>
+                    {children}
+                  </ol>
+                ),
+                li: ({ children, ...props }) => (
+                  <li className="pl-0.5" {...props}>
+                    {children}
+                  </li>
+                ),
+                strong: ({ children, ...props }) => (
+                  <strong className="font-semibold text-zinc-950" {...props}>
+                    {children}
+                  </strong>
+                ),
+                em: ({ children, ...props }) => (
+                  <em className="italic text-zinc-800" {...props}>
+                    {children}
+                  </em>
+                ),
+                a: ({ children, ...props }) => (
+                  <a
+                    className="font-medium text-emerald-800 underline decoration-emerald-300 underline-offset-2 hover:text-emerald-900"
+                    target="_blank"
+                    rel="noreferrer"
+                    {...props}
+                  >
+                    {children}
+                  </a>
+                ),
+                blockquote: ({ children, ...props }) => (
+                  <blockquote
+                    className="my-2 border-l-2 border-emerald-200 pl-3 text-zinc-800 [&>p]:my-0"
+                    {...props}
+                  >
+                    {children}
+                  </blockquote>
+                ),
+                code: ({ inline, className, children, ...props }) => {
+                  if (!inline) {
+                    return (
+                      <code className={["font-mono text-xs", className].join(" ")} {...props}>
+                        {children}
+                      </code>
+                    );
+                  }
+                  return (
+                    <code
+                      className="rounded-md bg-zinc-100 px-1 py-0.5 font-mono text-[0.85em] text-zinc-900 ring-1 ring-zinc-200/70"
+                      {...props}
+                    >
+                      {children}
+                    </code>
+                  );
+                },
+                pre: ({ children, ...props }) => (
+                  <pre
+                    className="my-2 overflow-x-auto rounded-2xl bg-zinc-950/90 p-3 text-xs leading-5 text-zinc-50 ring-1 ring-zinc-200/60"
+                    {...props}
+                  >
+                    {children}
+                  </pre>
+                ),
+              }}
+            >
+              {content}
+            </ReactMarkdown>
+          </div>
+        )}
       </div>
     </div>
   );
