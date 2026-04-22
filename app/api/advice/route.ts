@@ -21,7 +21,6 @@ function asNonNegativeInteger(value: unknown): number | null {
 }
 
 export async function POST(req: Request) {
-  return NextResponse.json({ debug: process.env.ANTHROPIC_API_KEY ? "key exists" : "key missing", allEnvKeys: Object.keys(process.env).filter(k => k.includes('ANTHROPIC')) });
   try {
     const apiKey = process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
