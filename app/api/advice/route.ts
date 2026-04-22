@@ -22,7 +22,7 @@ function asNonNegativeInteger(value: unknown): number | null {
 
 export async function POST(req: Request) {
   try {
-    const apiKey = process.env.ANTHROPIC_API_KEY;
+    const apiKey = process.env.CLAUDE_API_KEY || process.env.ANTHROPIC_API_KEY;
     if (!apiKey) {
       return NextResponse.json({ error: "Missing ANTHROPIC_API_KEY" }, { status: 500 });
     }
