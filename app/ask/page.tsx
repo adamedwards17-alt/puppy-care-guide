@@ -3,6 +3,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
+type SpeechRecognitionConstructor = new () => SpeechRecognition;
+
 type PuppyProfile = {
   name: string;
   dateOfBirth: string; // YYYY-MM-DD
@@ -26,6 +28,10 @@ export default function AskPage() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const bottomRef = useRef<HTMLDivElement | null>(null);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+  const recognitionRef = useRef<SpeechRecognition | null>(null);
+  const [speechSupported, setSpeechSupported] = useState(false);
+  const [listening, setListening] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -56,6 +62,47 @@ export default function AskPage() {
     })();
   }, [router]);
 
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+
+    const maybeCtor = (window.SpeechRecognition ??
+      window.webkitSpeechRecognition) as unknown as SpeechRecognitionConstructor | undefined;
+
+    if (!maybeCtor) {
+      setSpeechSupported(false);
+      recognitionRef.current = null;
+      return;
+    }
+
+    setSpeechSupported(true);
+    const rec = new maybeCtor();
+    rec.lang = "en-GB";
+    rec.interimResults = false;
+    rec.continuous = false;
+
+    rec.onresult = (event) => {
+      const text = event.results?.[0]?.[0]?.transcript ?? "";
+      if (text.trim().length === 0) return;
+      setDraft((prev) => (prev ? `${prev.replace(/\s+$/g, "")} ${text.trimStart()}` : text.trimStart()));
+      textareaRef.current?.focus();
+    };
+    rec.onend = () => setListening(false);
+    rec.onerror = () => setListening(false);
+
+    recognitionRef.current = rec;
+    return () => {
+      try {
+        rec.onresult = null;
+        rec.onend = null;
+        rec.onerror = null;
+        rec.abort();
+      } catch {
+        // ignore
+      }
+      recognitionRef.current = null;
+    };
+  }, []);
+
   const ageInWeeks = useMemo(() => {
     if (!profile?.dateOfBirth) return null;
     const dob = new Date(profile.dateOfBirth);
@@ -77,6 +124,14 @@ export default function AskPage() {
     setError(null);
     setDraft("");
     setLoading(true);
+    if (listening) {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        // ignore
+      }
+      setListening(false);
+    }
 
     const nextMessages: ChatMessage[] = [...messages, { role: "user", content: text }];
     setMessages(nextMessages);
@@ -190,6 +245,7 @@ export default function AskPage() {
           <div className="px-4 py-3">
             <div className="flex items-end gap-2">
               <textarea
+                ref={textareaRef}
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder={`Ask about ${puppyName}…`}
@@ -203,6 +259,49 @@ export default function AskPage() {
                 }}
                 disabled={loading}
               />
+              {speechSupported ? (
+                <button
+                  type="button"
+                  onClick={() => {
+                    const rec = recognitionRef.current;
+                    if (!rec) return;
+                    if (loading) return;
+
+                    if (listening) {
+                      try {
+                        rec.stop();
+                      } catch {
+                        // ignore
+                      }
+                      setListening(false);
+                      return;
+                    }
+
+                    try {
+                      setListening(true);
+                      rec.start();
+                    } catch {
+                      setListening(false);
+                    }
+                  }}
+                  disabled={loading}
+                  className={[
+                    "relative grid h-11 w-11 place-items-center rounded-full text-sm font-semibold shadow-sm ring-1 transition focus:outline-none focus:ring-2",
+                    listening
+                      ? "bg-emerald-600 text-white ring-emerald-700/20 focus:ring-emerald-300"
+                      : "bg-emerald-100 text-emerald-900 ring-emerald-200/70 hover:bg-emerald-200/70 focus:ring-emerald-200",
+                  ].join(" ")}
+                  aria-label={listening ? "Stop dictation" : "Start dictation"}
+                  aria-pressed={listening}
+                >
+                  {listening ? (
+                    <span className="absolute inset-0 -z-10 rounded-full">
+                      <span className="absolute inset-0 animate-ping rounded-full bg-emerald-400/40" />
+                    </span>
+                  ) : null}
+                  <MicIcon className="h-5 w-5" />
+                </button>
+              ) : null}
               <button
                 type="button"
                 onClick={() => void send()}
@@ -264,6 +363,14 @@ function SendIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
       <path d="M3.4 20.2a1 1 0 0 1-.95-1.3l2.6-7.3-2.6-7.3A1 1 0 0 1 3.7 3L21 12 3.7 21a1 1 0 0 1-.3.05ZM6.5 12l-1.9 5.3L17.9 12 4.6 6.7 6.5 12Zm0 0h6.7a1 1 0 1 0 0-2H6.5a1 1 0 1 0 0 2Z" />
+    </svg>
+  );
+}
+
+function MicIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm7-3a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11Z" />
     </svg>
   );
 }
