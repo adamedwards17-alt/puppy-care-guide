@@ -232,6 +232,16 @@ export default function AskPage() {
         </header>
 
         <main className="px-4 pb-28 pt-4">
+          <div className="mb-4 rounded-3xl bg-amber-50/80 px-4 py-3 ring-1 ring-amber-200/70">
+            <div className="flex items-start gap-2.5">
+              <ShieldIcon className="mt-0.5 h-4 w-4 shrink-0 text-amber-700" />
+              <p className="text-xs leading-5 text-amber-900">
+                <strong className="font-semibold">Advice is for guidance only.</strong>{" "}
+                Always consult your vet or an ABTC-accredited behaviourist for medical or behavioural concerns.
+              </p>
+            </div>
+          </div>
+
           <section className="rounded-3xl bg-white/80 p-4 shadow-sm ring-1 ring-zinc-200/60">
             <div className="text-sm leading-6 text-zinc-700">
               {`Hi! Ask me anything about ${puppyName}. I’ll remember what we’ve talked about during this session.`}
@@ -516,6 +526,14 @@ function MicIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
       <path d="M12 14a3 3 0 0 0 3-3V6a3 3 0 0 0-6 0v5a3 3 0 0 0 3 3Zm7-3a1 1 0 1 0-2 0 5 5 0 0 1-10 0 1 1 0 1 0-2 0 7 7 0 0 0 6 6.93V20H9a1 1 0 1 0 0 2h6a1 1 0 1 0 0-2h-2v-2.07A7 7 0 0 0 19 11Z" />
+    </svg>
+  );
+}
+
+function ShieldIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M12 2 4 5.5V12c0 4.4 3.4 8.2 8 9 4.6-.8 8-4.6 8-9V5.5L12 2Zm0 4a1 1 0 1 1 0 2 1 1 0 0 1 0-2Zm1 9h-2v-5h2v5Z" />
     </svg>
   );
 }
