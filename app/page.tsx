@@ -1,6 +1,63 @@
+"use client";
+
 import type { ReactNode } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+
+type PuppyProfile = {
+  name: string;
+  dateOfBirth: string; // YYYY-MM-DD
+  breed: string;
+};
+
+const PROFILE_STORAGE_KEY = "pawguide.profile";
 
 export default function Home() {
+  const router = useRouter();
+  const [profile, setProfile] = useState<PuppyProfile | null>(null);
+  const [loaded, setLoaded] = useState(false);
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+      if (!raw) {
+        setLoaded(true);
+        router.replace("/profile");
+        return;
+      }
+      const parsed = JSON.parse(raw) as Partial<PuppyProfile> | null;
+      if (!parsed?.name || !parsed?.dateOfBirth) {
+        setLoaded(true);
+        router.replace("/profile");
+        return;
+      }
+      setProfile({
+        name: String(parsed.name),
+        dateOfBirth: String(parsed.dateOfBirth),
+        breed: String(parsed.breed ?? ""),
+      });
+      setLoaded(true);
+    } catch {
+      setLoaded(true);
+      router.replace("/profile");
+    }
+  }, [router]);
+
+  const ageWeeks = useMemo(() => {
+    if (!profile?.dateOfBirth) return null;
+    const dob = new Date(profile.dateOfBirth);
+    if (Number.isNaN(dob.getTime())) return null;
+    const diffMs = Date.now() - dob.getTime();
+    const weeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
+    return Math.max(0, weeks);
+  }, [profile?.dateOfBirth]);
+
+  if (!loaded) {
+    return (
+      <div className="min-h-dvh bg-gradient-to-b from-amber-50 via-zinc-50 to-emerald-50 font-sans text-zinc-900" />
+    );
+  }
+
   return (
     <div className="min-h-dvh bg-gradient-to-b from-amber-50 via-zinc-50 to-emerald-50 font-sans text-zinc-900">
       <div className="mx-auto min-h-dvh w-full max-w-md">
@@ -12,9 +69,9 @@ export default function Home() {
                   <PawIcon className="h-5 w-5 text-emerald-800" />
                 </div>
                 <div className="leading-tight">
-                  <div className="text-base font-semibold tracking-tight">Pawguide</div>
+                  <div className="text-base font-semibold tracking-tight">{profile?.name ?? "Pawguide"}</div>
                   <div className="text-xs font-medium text-zinc-600">
-                    Daily routine for an 8-week puppy
+                    {ageWeeks === null ? "Daily routine for your puppy" : `Daily routine for a ${ageWeeks}-week puppy`}
                   </div>
                 </div>
               </div>
@@ -67,7 +124,7 @@ export default function Home() {
                   <div className="text-sm font-semibold text-zinc-900">A typical day</div>
                   <div className="inline-flex items-center gap-2 rounded-full bg-emerald-50 px-3 py-1 text-xs font-semibold text-emerald-800 ring-1 ring-emerald-200/60">
                     <ClockIcon className="h-3.5 w-3.5" />
-                    8 weeks old
+                    {ageWeeks === null ? "Puppy schedule" : `${ageWeeks} weeks old`}
                   </div>
                 </div>
                 <p className="mt-1 text-sm leading-6 text-zinc-600">
