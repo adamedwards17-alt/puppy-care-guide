@@ -1,7 +1,7 @@
 "use client";
 
 import type { ReactNode } from "react";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type PuppyProfile = {
@@ -12,45 +12,104 @@ type PuppyProfile = {
 
 const PROFILE_STORAGE_KEY = "pawguide.profile";
 
+const FALLBACK_POTTY_TIP =
+  "At 8 weeks, plan an outside trip right after waking, after eating, after play, and about every 30–60 minutes when awake.";
+
 export default function Home() {
   const router = useRouter();
   const [profile, setProfile] = useState<PuppyProfile | null>(null);
   const [loaded, setLoaded] = useState(false);
+  const [pottyAdvice, setPottyAdvice] = useState<string | null>(null);
+  const [pottyAdviceLoading, setPottyAdviceLoading] = useState(false);
+  const lastPottyAdviceKeyRef = useRef<string | null>(null);
+  const [nowMs, setNowMs] = useState<number | null>(null);
+  const initializedRef = useRef(false);
 
   useEffect(() => {
-    try {
-      const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
-      if (!raw) {
-        setLoaded(true);
+    if (initializedRef.current) return;
+    initializedRef.current = true;
+
+    queueMicrotask(() => setNowMs(Date.now()));
+
+    (async () => {
+      try {
+        const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+        if (!raw) {
+          queueMicrotask(() => setLoaded(true));
+          router.replace("/profile");
+          return;
+        }
+        const parsed = JSON.parse(raw) as Partial<PuppyProfile> | null;
+        if (!parsed?.name || !parsed?.dateOfBirth) {
+          queueMicrotask(() => setLoaded(true));
+          router.replace("/profile");
+          return;
+        }
+        queueMicrotask(() => {
+          setProfile({
+            name: String(parsed.name),
+            dateOfBirth: String(parsed.dateOfBirth),
+            breed: String(parsed.breed ?? ""),
+          });
+          setLoaded(true);
+        });
+      } catch {
+        queueMicrotask(() => setLoaded(true));
         router.replace("/profile");
-        return;
       }
-      const parsed = JSON.parse(raw) as Partial<PuppyProfile> | null;
-      if (!parsed?.name || !parsed?.dateOfBirth) {
-        setLoaded(true);
-        router.replace("/profile");
-        return;
-      }
-      setProfile({
-        name: String(parsed.name),
-        dateOfBirth: String(parsed.dateOfBirth),
-        breed: String(parsed.breed ?? ""),
-      });
-      setLoaded(true);
-    } catch {
-      setLoaded(true);
-      router.replace("/profile");
-    }
-  }, [router]);
+    })();
+  }, []);
 
   const ageWeeks = useMemo(() => {
-    if (!profile?.dateOfBirth) return null;
+    if (!profile?.dateOfBirth || nowMs === null) return null;
     const dob = new Date(profile.dateOfBirth);
     if (Number.isNaN(dob.getTime())) return null;
-    const diffMs = Date.now() - dob.getTime();
+    const diffMs = nowMs - dob.getTime();
     const weeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
     return Math.max(0, weeks);
-  }, [profile?.dateOfBirth]);
+  }, [profile, nowMs]);
+
+  useEffect(() => {
+    if (!profile?.name || ageWeeks === null) return;
+
+    const key = JSON.stringify({ name: profile.name, breed: profile.breed ?? "", ageWeeks });
+    if (lastPottyAdviceKeyRef.current === key) return;
+    lastPottyAdviceKeyRef.current = key;
+
+    const controller = new AbortController();
+    queueMicrotask(() => {
+      setPottyAdviceLoading(true);
+      setPottyAdvice(null);
+    });
+
+    (async () => {
+      try {
+        const res = await fetch("/api/advice", {
+          method: "POST",
+          headers: { "content-type": "application/json" },
+          body: JSON.stringify({
+            name: profile.name,
+            breed: profile.breed ?? "",
+            ageInWeeks: ageWeeks,
+          }),
+          signal: controller.signal,
+        });
+
+        if (!res.ok) throw new Error(`Advice request failed: ${res.status}`);
+        const data = (await res.json()) as { advice?: unknown };
+        if (typeof data.advice !== "string" || data.advice.trim().length === 0) {
+          throw new Error("Advice response missing 'advice'");
+        }
+        setPottyAdvice(data.advice.trim());
+      } catch {
+        setPottyAdvice(FALLBACK_POTTY_TIP);
+      } finally {
+        setPottyAdviceLoading(false);
+      }
+    })();
+
+    return () => controller.abort();
+  }, [profile?.name, profile?.breed, ageWeeks]);
 
   if (!loaded) {
     return (
@@ -100,7 +159,11 @@ export default function Home() {
               <QuickTip
                 tone="emerald"
                 title="Potty pacing"
-                body="At 8 weeks, plan an outside trip right after waking, after eating, after play, and about every 30–60 minutes when awake."
+                body={
+                  pottyAdviceLoading
+                    ? `Getting advice for ${profile?.name ?? "your puppy"}...`
+                    : (pottyAdvice ?? FALLBACK_POTTY_TIP)
+                }
                 icon={<DropletIcon className="h-4 w-4" />}
               />
               <QuickTip
