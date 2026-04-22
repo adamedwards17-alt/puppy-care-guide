@@ -59,37 +59,40 @@ export async function POST(req: Request) {
       `Make it practical, kind, and specific to breed tendencies and this age. No lists, no emojis.`,
     ].join("\n");
 
-    let message: Awaited<ReturnType<typeof client.messages.create>>;
     try {
-      message = await client.messages.create({
+      const message = await client.messages.create({
         model: "claude-3-5-sonnet-latest",
         max_tokens: 120,
         temperature: 0.7,
         messages: [{ role: "user", content: prompt }],
+        stream: false,
       });
-    } catch (error) {
+      const advice = message.content
+        .filter(
+          (block): block is Extract<typeof block, { type: "text" }> =>
+            block.type === "text",
+        )
+        .map((block) => block.text.trim())
+        .filter(Boolean)
+        .join("\n")
+        .replace(/\s+/g, " ")
+        .trim();
+
+      if (!advice) {
+        return NextResponse.json({ error: "No advice generated" }, { status: 502 });
+      }
+
+      return NextResponse.json({ advice });
+    } catch (error: any) {
+      const errorMessage = error instanceof Error ? error.message : String(error);
       console.error("[/api/advice] anthropic request failed", error);
       console.error(
         "[/api/advice] anthropic error message",
-        error instanceof Error ? error.message : String(error),
+        errorMessage,
       );
       return NextResponse.json({ error: "Anthropic request failed" }, { status: 502 });
     }
-
-    const advice = message.content
-      .filter((block) => block.type === "text")
-      .map((block) => block.text.trim())
-      .filter(Boolean)
-      .join("\n")
-      .replace(/\s+/g, " ")
-      .trim();
-
-    if (!advice) {
-      return NextResponse.json({ error: "No advice generated" }, { status: 502 });
-    }
-
-    return NextResponse.json({ advice });
-  } catch (error) {
+  } catch (error: any) {
     console.error("[/api/advice] POST crashed", error);
     if (error instanceof Error) {
       console.error("[/api/advice] crash details", {
