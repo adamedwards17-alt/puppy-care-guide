@@ -1,12 +1,13 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 
 type PuppyProfile = {
   name: string;
   dateOfBirth: string; // YYYY-MM-DD
   breed: string;
+  gender: "Boy" | "Girl";
 };
 
 const PROFILE_STORAGE_KEY = "pawguide.profile";
@@ -40,6 +41,21 @@ export default function ProfilePage() {
   const [name, setName] = useState("");
   const [dateOfBirth, setDateOfBirth] = useState("");
   const [breed, setBreed] = useState("");
+  const [gender, setGender] = useState<"Boy" | "Girl">("Boy");
+
+  useEffect(() => {
+    try {
+      const raw = localStorage.getItem(PROFILE_STORAGE_KEY);
+      if (!raw) return;
+      const parsed = JSON.parse(raw) as Partial<PuppyProfile> | null;
+      if (parsed?.name) setName(String(parsed.name));
+      if (parsed?.dateOfBirth) setDateOfBirth(String(parsed.dateOfBirth));
+      if (parsed?.breed) setBreed(String(parsed.breed));
+      if (parsed?.gender === "Boy" || parsed?.gender === "Girl") setGender(parsed.gender);
+    } catch {
+      // ignore
+    }
+  }, []);
 
   const canSubmit = useMemo(() => {
     return name.trim().length > 0 && dateOfBirth.trim().length > 0 && breed.trim().length > 0;
@@ -73,7 +89,7 @@ export default function ProfilePage() {
               onSubmit={(e) => {
                 e.preventDefault();
                 if (!canSubmit) return;
-                saveProfile({ name: name.trim(), dateOfBirth, breed: breed.trim() });
+                saveProfile({ name: name.trim(), dateOfBirth, breed: breed.trim(), gender });
                 router.push("/");
               }}
             >
@@ -123,6 +139,21 @@ export default function ProfilePage() {
                 </datalist>
               </Field>
 
+              <Field label="Gender" htmlFor="gender">
+                <div className="grid grid-cols-2 gap-2">
+                  <GenderOption
+                    active={gender === "Boy"}
+                    label="Boy"
+                    onClick={() => setGender("Boy")}
+                  />
+                  <GenderOption
+                    active={gender === "Girl"}
+                    label="Girl"
+                    onClick={() => setGender("Girl")}
+                  />
+                </div>
+              </Field>
+
               <div className="pt-1 text-xs font-medium text-zinc-600">
                 You can change this later — we just need a starting point.
               </div>
@@ -168,6 +199,32 @@ function Field({
       </label>
       <div className="mt-2">{children}</div>
     </div>
+  );
+}
+
+function GenderOption({
+  label,
+  active,
+  onClick,
+}: {
+  label: "Boy" | "Girl";
+  active: boolean;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      aria-pressed={active}
+      className={[
+        "rounded-2xl px-4 py-3 text-sm font-semibold shadow-sm ring-1 transition",
+        active
+          ? "bg-emerald-100 text-emerald-900 ring-emerald-200/70"
+          : "bg-white/70 text-zinc-700 ring-zinc-200/70 hover:bg-white",
+      ].join(" ")}
+    >
+      {label}
+    </button>
   );
 }
 

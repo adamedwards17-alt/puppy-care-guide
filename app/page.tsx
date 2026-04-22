@@ -358,8 +358,9 @@ export default function Home() {
         </main>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md border-t border-zinc-200/70 bg-white/80 backdrop-blur">
-          <div className="grid grid-cols-3 px-6 py-3">
+          <div className="grid grid-cols-4 px-4 py-3">
             <BottomTab label="Routine" active icon={<ClockIcon className="h-5 w-5" />} />
+            <BottomTab label="Ask" icon={<ChatIcon className="h-5 w-5" />} onClick={() => router.push("/ask")} />
             <BottomTab label="Potty" icon={<PawOutlineIcon className="h-5 w-5" />} />
             <BottomTab label="Tips" icon={<HeartIcon className="h-5 w-5" />} />
           </div>
@@ -374,14 +375,17 @@ function BottomTab({
   label,
   icon,
   active,
+  onClick,
 }: {
   label: string;
   icon: ReactNode;
   active?: boolean;
+  onClick?: () => void;
 }) {
   return (
     <button
       type="button"
+      onClick={onClick}
       className={[
         "flex flex-col items-center justify-center gap-1 rounded-2xl px-3 py-2 text-xs font-semibold",
         active ? "text-emerald-900" : "text-zinc-500",
@@ -399,6 +403,14 @@ function BottomTab({
       </span>
       {label}
     </button>
+  );
+}
+
+function ChatIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M6.5 4A4.5 4.5 0 0 0 2 8.5v4A4.5 4.5 0 0 0 6.5 17H7v2a1 1 0 0 0 1.6.8L12 17h5.5A4.5 4.5 0 0 0 22 12.5v-4A4.5 4.5 0 0 0 17.5 4h-11ZM6 9.5a1 1 0 1 1 2 0 1 1 0 0 1-2 0Zm5 0a1 1 0 1 1 2 0 1 1 0 0 1-2 0Zm5 0a1 1 0 1 1 2 0 1 1 0 0 1-2 0Z" />
+    </svg>
   );
 }
 
