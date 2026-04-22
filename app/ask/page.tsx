@@ -448,14 +448,18 @@ function ChatBubble({ role, content }: { role: "user" | "assistant"; content: st
                     {children}
                   </blockquote>
                 ),
-                code: ({ inline, className, children, ...props }) => {
-                  if (!inline) {
+                code: ({ className, children, ...props }) => {
+                  const isBlockCode =
+                    typeof className === "string" && className.split(" ").some((c) => c.startsWith("language-"));
+
+                  if (isBlockCode) {
                     return (
-                      <code className={["font-mono text-xs", className].join(" ")} {...props}>
+                      <code className={["font-mono text-xs", className].filter(Boolean).join(" ")} {...props}>
                         {children}
                       </code>
                     );
                   }
+
                   return (
                     <code
                       className="rounded-md bg-zinc-100 px-1 py-0.5 font-mono text-[0.85em] text-zinc-900 ring-1 ring-zinc-200/70"
