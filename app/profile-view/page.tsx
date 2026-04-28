@@ -266,11 +266,12 @@ export default function ProfileViewPage() {
         </main>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md border-t border-zinc-200/70 bg-white/80 backdrop-blur">
-          <div className="grid grid-cols-5 px-2 py-3">
+          <div className="grid grid-cols-6 px-1 py-3">
             <BottomTab label="Routine" icon={<ClockIcon className="h-5 w-5" />} onClick={() => router.push("/")} />
             <BottomTab label="Ask" icon={<ChatIcon className="h-5 w-5" />} onClick={() => router.push("/ask")} />
             <BottomTab label="Potty" icon={<PawOutlineIcon className="h-5 w-5" />} />
             <BottomTab label="Tips" icon={<HeartIcon className="h-5 w-5" />} />
+            <BottomTab label="Progress" icon={<ChartIcon className="h-5 w-5" />} onClick={() => router.push("/progress")} />
             <BottomTab label="Profile" active icon={<UserIcon className="h-5 w-5" />} />
           </div>
           {editing ? (
@@ -390,7 +391,7 @@ function BottomTab({
       type="button"
       onClick={onClick}
       className={[
-        "flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-xs font-semibold",
+        "flex flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-xs font-semibold",
         active ? "text-emerald-900" : "text-zinc-500",
       ].join(" ")}
     >
@@ -464,6 +465,14 @@ function UserIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
       <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5.33 0-8 2.67-8 4v1h16v-1c0-1.33-2.67-4-8-4Z" />
+    </svg>
+  );
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3 3v18h18M7 16v-4m4 4v-7m4 7v-2m4 2V8" />
     </svg>
   );
 }

@@ -10,7 +10,18 @@ type PuppyProfile = {
   breed: string;
 };
 
+type SkillRating = 1 | 2 | 3;
+type SkillKey = "sit" | "down" | "recall" | "leaveIt" | "looseLead" | "crate" | "socialisation";
+
+type CheckIn = {
+  week: number;
+  completedAt: string;
+  skills: Record<SkillKey, SkillRating>;
+  assessment?: string;
+};
+
 const PROFILE_STORAGE_KEY = "pawguide.profile";
+const CHECKIN_STORAGE_KEY = "pawguide.checkins";
 
 const FALLBACK_POTTY_TIP =
   "At 8 weeks, plan an outside trip right after waking, after eating, after play, and about every 30–60 minutes when awake.";
@@ -23,6 +34,8 @@ export default function Home() {
   const [pottyAdviceLoading, setPottyAdviceLoading] = useState(false);
   const lastPottyAdviceKeyRef = useRef<string | null>(null);
   const [nowMs, setNowMs] = useState<number | null>(null);
+  const [checkins, setCheckins] = useState<CheckIn[]>([]);
+  const [bannerDismissed, setBannerDismissed] = useState(false);
   const initializedRef = useRef(false);
 
   useEffect(() => {
@@ -52,6 +65,15 @@ export default function Home() {
             breed: String(parsed.breed ?? ""),
           });
           setLoaded(true);
+          try {
+            const rawC = localStorage.getItem(CHECKIN_STORAGE_KEY);
+            if (rawC) {
+              const c = JSON.parse(rawC);
+              if (Array.isArray(c)) setCheckins(c as CheckIn[]);
+            }
+          } catch {
+            // ignore
+          }
         });
       } catch {
         queueMicrotask(() => setLoaded(true));
@@ -68,6 +90,11 @@ export default function Home() {
     const weeks = Math.floor(diffMs / (7 * 24 * 60 * 60 * 1000));
     return Math.max(0, weeks);
   }, [profile, nowMs]);
+
+  const showBanner = useMemo(() => {
+    if (!profile || ageWeeks === null || bannerDismissed) return false;
+    return !checkins.some((c) => c.week === ageWeeks);
+  }, [profile, ageWeeks, bannerDismissed, checkins]);
 
   useEffect(() => {
     if (!profile?.name || ageWeeks === null) return;
@@ -142,6 +169,31 @@ export default function Home() {
         </header>
 
         <main className="px-4 pb-24 pt-4">
+          {showBanner && (
+            <div className="mb-4 flex items-start gap-3 rounded-2xl bg-amber-50/90 p-3.5 ring-1 ring-amber-200/70">
+              <div className="flex-1 min-w-0">
+                <p className="text-sm font-semibold text-amber-900">
+                  Time for {profile!.name}&apos;s weekly training check-in 🐾
+                </p>
+                <button
+                  type="button"
+                  onClick={() => router.push("/checkin")}
+                  className="mt-2 rounded-xl bg-emerald-600 px-3 py-1.5 text-xs font-semibold text-white shadow-sm ring-1 ring-emerald-700/20 hover:bg-emerald-700 transition"
+                >
+                  Start check-in
+                </button>
+              </div>
+              <button
+                type="button"
+                onClick={() => setBannerDismissed(true)}
+                className="grid h-7 w-7 shrink-0 place-items-center rounded-xl text-amber-700 hover:bg-amber-100/80 transition"
+                aria-label="Dismiss"
+              >
+                <CloseIcon className="h-4 w-4" />
+              </button>
+            </div>
+          )}
+
           <section className="rounded-3xl bg-white/80 p-4 shadow-sm ring-1 ring-zinc-200/60">
             <div className="flex items-start justify-between gap-3">
               <div>
@@ -358,11 +410,12 @@ export default function Home() {
         </main>
 
         <nav className="fixed inset-x-0 bottom-0 z-30 mx-auto w-full max-w-md border-t border-zinc-200/70 bg-white/80 backdrop-blur">
-          <div className="grid grid-cols-5 px-2 py-3">
+          <div className="grid grid-cols-6 px-1 py-3">
             <BottomTab label="Routine" active icon={<ClockIcon className="h-5 w-5" />} />
             <BottomTab label="Ask" icon={<ChatIcon className="h-5 w-5" />} onClick={() => router.push("/ask")} />
             <BottomTab label="Potty" icon={<PawOutlineIcon className="h-5 w-5" />} />
             <BottomTab label="Tips" icon={<HeartIcon className="h-5 w-5" />} />
+            <BottomTab label="Progress" icon={<ChartIcon className="h-5 w-5" />} onClick={() => router.push("/progress")} />
             <BottomTab label="Profile" icon={<UserIcon className="h-5 w-5" />} onClick={() => router.push("/profile-view")} />
           </div>
           <div className="pb-[max(env(safe-area-inset-bottom),0.5rem)]" />
@@ -388,7 +441,7 @@ function BottomTab({
       type="button"
       onClick={onClick}
       className={[
-        "flex flex-col items-center justify-center gap-1 rounded-2xl px-2 py-2 text-xs font-semibold",
+        "flex flex-col items-center justify-center gap-1 rounded-2xl px-1 py-2 text-xs font-semibold",
         active ? "text-emerald-900" : "text-zinc-500",
       ].join(" ")}
     >
@@ -632,6 +685,22 @@ function UserIcon({ className }: { className?: string }) {
   return (
     <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
       <path d="M12 12a5 5 0 1 0 0-10 5 5 0 0 0 0 10Zm0 2c-5.33 0-8 2.67-8 4v1h16v-1c0-1.33-2.67-4-8-4Z" />
+    </svg>
+  );
+}
+
+function ChartIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className={className} aria-hidden="true">
+      <path d="M3 3v18h18M7 16v-4m4 4v-7m4 7v-2m4 2V8" />
+    </svg>
+  );
+}
+
+function CloseIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" fill="currentColor" className={className} aria-hidden="true">
+      <path d="M18 6 6 18M6 6l12 12" stroke="currentColor" strokeWidth="2" strokeLinecap="round" fill="none" />
     </svg>
   );
 }
